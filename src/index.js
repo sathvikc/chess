@@ -1,10 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import App from './App';
+import Chess from './Chess';
+import './index.css'
+import './styles.scss';
 
 ReactDOM.render(
   <React.StrictMode>
-    <App />
+    <Chess />
   </React.StrictMode>,
   document.getElementById('root')
 );
