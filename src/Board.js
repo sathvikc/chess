@@ -1,6 +1,6 @@
 import React, { PureComponent } from 'react';
 
-import { players, defaultBoardState } from './Constants';
+import { players, defaultBoardState, pieceImages } from './Constants';
 
 const { WHITE, BLACK } = players;
 
@@ -38,12 +38,36 @@ class Board extends PureComponent {
     });
   };
 
-  onCellClick = (event) => {
-    const cellCooridinate = event.target.value;
+  getCellInformation = (cellCooridinate, board) => {
+    const chessPiece =  board ? board[cellCooridinate] : this.state.board[cellCooridinate];
 
+    return chessPiece || '';
+  }
+
+  isPlayerChessPiece = (chessPiece = '', playerTurn = this.state.playerTurn) => {
+    return chessPiece.startsWith(playerTurn);
+  }
+
+  onCellClick = (cellCooridinate) => {
     this.setState((state) => {
+      const prevSelectedChessPiece = this.getCellInformation(state.selectedCoordinate, state.board);
+      const selectedChessPiece = this.getCellInformation(cellCooridinate, state.board);
+      const isPlayerChessPiece = this.isPlayerChessPiece(selectedChessPiece, state.playerTurn);
+
+      if(!isPlayerChessPiece && prevSelectedChessPiece) {
+        return {
+          selectedCoordinate: '',
+          playerTurn: state.playerTurn === WHITE ? BLACK : WHITE,
+          board: {
+            ...state.board,
+            [state.selectedCoordinate]: '',
+            [cellCooridinate]: prevSelectedChessPiece,
+          }
+        }
+      }
+
       return {
-        selectedCoordinate: state.selectedCoordinate === cellCooridinate ? '' : cellCooridinate
+        selectedCoordinate: state.selectedCoordinate === cellCooridinate ? '' : cellCooridinate,
       }
     });
   }
@@ -68,18 +92,22 @@ class Board extends PureComponent {
                   const cellColor = (rowPosition + inx) % 2 === 1 ? 'black' : 'white';
 
                   const cellCooridinate = `${cellPosition}${rowPosition}`;
-                  const isPiece = board[cellCooridinate] ? true : false;
+                  const chessPiece = board[cellCooridinate] || '';
+
+                  const isChessPiece = board[cellCooridinate] ? true : false;
+                  const isPlayerChessPiece = this.isPlayerChessPiece(chessPiece);
+                  const isActive = this.state.selectedCoordinate === cellCooridinate;
+                  const isClickable = isPlayerChessPiece || this.state.selectedCoordinate;
 
                   return (
                     <button 
                       key={cellId}
-                      value={cellCooridinate}
-                      className={`cell ${cellColor} ${isPiece ? 'pointer' : ''}`}
-                      onClick={this.onCellClick}
-                      disabled={!isPiece}
+                      className={`cell ${cellColor} ${isClickable ? 'pointer' : ''} ${isActive ? 'active' : ''}`}
+                      onClick={() => this.onCellClick(cellCooridinate)}
+                      disabled={!isClickable}
                     >
-                      { isPiece ? <img src={board[cellCooridinate]} className="piece-img" alt="chess piece" /> : null }
-                      
+                      { isChessPiece ? <img src={pieceImages[board[cellCooridinate]]} className="piece-img" alt="chess piece" /> : null }
+
                       <span className="cell-name">
                         { cellCooridinate }
                       </span>
