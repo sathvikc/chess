@@ -2,13 +2,50 @@
   font-family: 'Roboto', sans-serif;
 }
 
+:root {
+  
+}
+
+// boardBorderColor: '#803E04',
+//             lightBoxColor: '#FFCE9E',
+//             darkBoxColor: '#D18B47',
+//             optionColor: '#803E04',
+//             optionHoverColor: '#311B0B'
+
 .pointer {
   cursor: pointer;
 }
 
+.player-turn {
+  width: 40rem;
+  margin: 0 auto;
+  text-align: right;
+  font-size: 20px;
+  font-weight: bolder;
+  margin-bottom: 10px;
+}
+
 /* ========= BOARD STYLES - START ========= */
 .board {
-  border: 25px solid #803E04;
+  &.light {
+    --board-border-color: #803E04;
+    --light-color: #FFCE9E;
+    --dark-color: #D18B47;
+    --active-color: #BBCA48;
+    --attack-color: #FF0000;
+    --suggest-color: #000000;
+  }
+
+  &.dark {
+    --board-border-color: #023850;
+    --light-color: #697382;
+    --dark-color: #2D323F;
+    --active-color: #5F8F75;
+    --attack-color: #FF0000;
+    --suggest-color: #000000;
+  }
+
+  border: 25px solid var(--board-border-color);
   border-radius: 10px;
   width: 40rem;
   margin: auto;
@@ -25,15 +62,35 @@
     height: 100%;
     text-align: center;
     border: 0;
+    padding: 0;
     outline: none;
     &.black {
-      background-color: #D18B47
+      background-color: var(--dark-color);
     }
     &.white {
-      background-color: #FFCE9E;
+      background-color: var(--light-color);
     }
     &.active {
-      background-color: #BBCA48;
+      background-color: var(--active-color);
+    }
+    
+    & .suggest {
+      position: absolute;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.2;
+      background-color: var(--suggest-color);
+      width: 35%;
+      height: 35%;
+      border-radius: 100px;
+      transform: translate(-50%, -50%);
+      top: 50%;
+      left: 50%;
+
+      &.red {
+        background-color: var(--attack-color);
+        opacity: 0.9;
+      }
     }
 
     & .piece-img {
@@ -45,8 +102,15 @@
       position: absolute;
       top: 4px;
       right: 4px;
-      font-size: 12px;
-      color: black;
+      font-size: 14px;
+      font-weight: bold;
+      
+      &.black {
+        color: var(--light-color);
+      }
+      &.white {
+        color: var(--dark-color);
+      }
     }
   }
 }
