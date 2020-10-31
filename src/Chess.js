@@ -4,9 +4,7 @@ import Board from './Board';
 
 function Chess() {
   return (
-    <div className="chess-container">
-      <Board />
-    </div>
+    <Board />
   );
 }
 

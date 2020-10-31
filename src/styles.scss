@@ -2,16 +2,6 @@
   font-family: 'Roboto', sans-serif;
 }
 
-:root {
-  
-}
-
-// boardBorderColor: '#803E04',
-//             lightBoxColor: '#FFCE9E',
-//             darkBoxColor: '#D18B47',
-//             optionColor: '#803E04',
-//             optionHoverColor: '#311B0B'
-
 .pointer {
   cursor: pointer;
 }
@@ -47,8 +37,13 @@
 
   border: 25px solid var(--board-border-color);
   border-radius: 10px;
-  width: 40rem;
+  width: fit-content;
   margin: auto;
+
+  & .board-row {
+    display: block;
+    height: 5rem;
+  }
 
   & .row {
     display: block;
@@ -73,6 +68,9 @@
     &.active {
       background-color: var(--active-color);
     }
+    &.check {
+      background-color: var(--attack-color);
+    }
     
     & .suggest {
       position: absolute;
@@ -96,6 +94,9 @@
     & .piece-img {
       width: 100%;
       height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
 
     & .cell-name {

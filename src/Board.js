@@ -1,4 +1,4 @@
-import React, { PureComponent, Fragment } from 'react';
+import React, { PureComponent } from 'react';
 
 import { players, defaultBoardState, pieceImages } from './Constants';
 
@@ -472,9 +472,11 @@ class Board extends PureComponent {
     super();
 
     this.state = {
+      theme: 'light',
       board: defaultBoardState,
       orientation: WHITE,
       isAutoOrientation: false,
+      showPossibleMoves: true,
       playerTurn: WHITE,
       selectedCoordinate: '',
       enPassantPieceCoordinate: '',
@@ -624,6 +626,31 @@ class Board extends PureComponent {
     }
   }
 
+  onThemeChange = (event) => {
+    event.preventDefault();
+    this.setState({
+      theme: event.target.value
+    });
+  }
+
+  toggleAutoOrientation = (event) => {
+    // event.preventDefault();
+    this.setState((state) => {
+      return {
+        isAutoOrientation: !state.isAutoOrientation,
+        orientation: this.state.playerTurn,
+      } 
+    });
+  }
+
+  togglePossibleMoves = () => {
+    this.setState((state) => {
+      return {
+        showPossibleMoves: !state.showPossibleMoves,
+      } 
+    });
+  }
+
   render() {
     const board = this.state.board;
 
@@ -640,61 +667,99 @@ class Board extends PureComponent {
     const playerInCheck = this.state.playerInCheck;
     
     return (
-      <Fragment>
-        <div className="player-turn">
-          <span> <strong>{ this.state.playerTurn === WHITE ? 'WHITE' : 'BLACK' }</strong> to move </span>
-        </div>
-        <div className="board light">
-          {
-            boardPositions.map((cellPositions, index) => {
-              index = isBlack ? index + 1 : (index - 8) * -1;
-              const rowId = `row-${index}`;
+      <div className="container-fluid">
+        <div className="row">
 
-              const rowPosition = index;
+          <div className="col">
+            <h5 className="mt-5 mb-4">Options</h5>
 
-              return (
-                <div className="row" key={rowId}>
-                  {
-                    cellPositions.map((cellPosition, inx) => {
-                      const cellId = `cell-${cellPosition}`;
-                      const cellColor = (rowPosition + inx + pieceColorValue) % 2 === 1 ? 'black' : 'white';
-
-                      const cellCooridinate = `${cellPosition}${rowPosition}`;
-                      const chessPiece = board[cellCooridinate] || '';
-
-                      const isChessPiece = board[cellCooridinate] ? true : false;
-                      const isPlayerChessPiece = this.isPlayerChessPiece(chessPiece);
-                      const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? cellCooridinate === getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) || this.isOpponentChessPiece(chessPiece) : this.isOpponentChessPiece(chessPiece);
-                      const isActive = this.state.selectedCoordinate === cellCooridinate;
-                      const isPossibleMove = selectedPieceNextMoves.includes(cellCooridinate);
-                      const isClickable = isPlayerChessPiece || isPossibleMove;
-
-                      const isPlayerKing = chessPiece.startsWith(playerInCheck) && chessPiece.endsWith('k');
-
-                      return (
-                        <button 
-                          key={cellId}
-                          className={`cell ${cellColor} ${isClickable ? 'pointer' : ''} ${isActive ? 'active' : ''} ${isPlayerKing ? 'check' : ''}`}
-                          onClick={() => { this.onCellClick(cellCooridinate); }}
-                          disabled={!isClickable}
-                        >
-                          { isChessPiece ? <img src={pieceImages[board[cellCooridinate]]} className="piece-img" alt="chess piece" /> : null }
-
-                          { isPossibleMove && <span className={`suggest ${isOpponentChessPiece ? 'red' : ''}`} /> }
-
-                          <span className={`cell-name ${cellColor}`}>
-                            { cellCooridinate }
-                          </span>
-                        </button>
-                      );
-                    })
-                  }
+            <div className="form-group row">
+              <label className="col-sm-6 col-form-label">Select Theme</label>
+              <div className="col-sm-6">
+                <select className="custom-select" value={this.state.theme} onChange={this.onThemeChange}>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group row">
+              <label className="col-sm-6 col-form-label">Auto Orientation</label>
+              <div className="col-sm-6">
+                <div className="form-check mt-1">
+                  <input className="form-check-input position-static" type="checkbox" checked={this.state.isAutoOrientation} onChange={this.toggleAutoOrientation} />
                 </div>
-              );
-            })
-          }
+              </div>
+            </div>
+            <div className="form-group row">
+              <label className="col-sm-6 col-form-label">Show Possible Moves</label>
+              <div className="col-sm-6">
+                <div className="form-check mt-1">
+                  <input className="form-check-input position-static" type="checkbox" checked={this.state.showPossibleMoves} onChange={this.togglePossibleMoves} />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="col-6">
+
+            <div className="player-turn">
+              <span> <strong>{this.state.playerTurn === WHITE ? 'WHITE' : 'BLACK'}</strong> to move</span>
+            </div>
+
+            <div className="container">
+              <div className={`board ${this.state.theme}`}>
+                {boardPositions.map((cellPositions, index) => {
+                  index = isBlack ? index + 1 : (index - 8) * -1;
+                  const rowId = `row-${index}`;
+
+                  const rowPosition = index;
+
+                  return (
+                    <div className="board-row" key={rowId}>
+                      {cellPositions.map((cellPosition, inx) => {
+                        const cellId = `cell-${cellPosition}`;
+                        const cellColor = (rowPosition + inx + pieceColorValue) % 2 === 1 ? 'black' : 'white';
+
+                        const cellCooridinate = `${cellPosition}${rowPosition}`;
+                        const chessPiece = board[cellCooridinate] || '';
+
+                        const isChessPiece = board[cellCooridinate] ? true : false;
+                        const isPlayerChessPiece = this.isPlayerChessPiece(chessPiece);
+                        const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? cellCooridinate === getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) || this.isOpponentChessPiece(chessPiece) : this.isOpponentChessPiece(chessPiece);
+                        const isActive = this.state.selectedCoordinate === cellCooridinate;
+                        const isPossibleMove = selectedPieceNextMoves.includes(cellCooridinate);
+                        const isClickable = isPlayerChessPiece || isPossibleMove;
+
+                        const isPlayerKing = chessPiece.startsWith(playerInCheck) && chessPiece.endsWith('k');
+
+                        return (
+                          <button 
+                            key={cellId} 
+                            className={`cell ${cellColor} ${isClickable ? 'pointer' : ''} ${isActive ? 'active' : ''} ${isPlayerKing ? 'check' : ''}`}
+                            onClick={() => { this.onCellClick(cellCooridinate); }}
+                            disabled={!isClickable}
+                          >
+                            { isChessPiece ? <img src={pieceImages[board[cellCooridinate]]} className="piece-img" alt="chess piece" /> : null }
+
+                            { this.state.showPossibleMoves && isPossibleMove && <span className={`suggest ${isOpponentChessPiece ? 'red' : ''}`} /> }
+
+                            <span className={`cell-name ${cellColor}`}> {cellCooridinate} </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          
+          <div className="col">
+            <h5 className="mt-5 mb-4">Move History</h5>
+          </div>
         </div>
-      </Fragment>
+      </div>
     );
   }
 }
