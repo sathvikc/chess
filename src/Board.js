@@ -1035,7 +1035,7 @@ class Board extends PureComponent {
 
             <div className="container fen-details">
               <div className="form-group">
-                <label>FEN String: </label>
+                <label>FEN Notation: </label>
                 <div className="input-group">
                   <input id="fen-string" type="text" className="form-control" value={this.state.FENString} onChange={this.onFENChange}  />
                   <div className="input-group-append">
