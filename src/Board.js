@@ -1,6 +1,6 @@
 import React, { PureComponent } from 'react';
 
-import { players, defaultBoardState, pieceImages } from './Constants';
+import { players, defaultBoardState, pieceImages, castlingReplaceStrings } from './Constants';
 
 const { WHITE, BLACK } = players;
 
@@ -282,7 +282,23 @@ function getQueenMoves(piece, board) {
   return availableMoves;
 }
 
-function getKingMoves(piece, board, availableCastlingMovesString) {
+function checkCastlingAvailable(castlingString, piece, returnString = false) {
+  if(castlingString) {
+    const regexString = piece['color'] === WHITE ? /[A-Z]+/g : /[a-z]+/g;
+
+    const result = castlingString.match(regexString);
+
+    if(result && returnString) {
+      return result[0];
+    }
+
+    return result ? true : false;
+  }
+
+  return false;
+}
+
+function getKingMoves(piece, board, castlingString) {
   const possibleMoves = [ [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 1], [0, -1], [1, 0], [-1, 0] ];
   // const castlingMoves = [ [0, 2], [0, -2] ];
   // const checkCastlingPositions = [ [0, 1], [0, -1] ];
@@ -306,88 +322,20 @@ function getKingMoves(piece, board, availableCastlingMovesString) {
     return null;
   });
 
-  // const availableCastlings = {
-  //   w: {
-  //     k: availableCastlingMovesString.includes('K'),
-  //     q: availableCastlingMovesString.includes('Q'),
-  //   },
-  //   b: {
-  //     k: availableCastlingMovesString.includes('k'),
-  //     q: availableCastlingMovesString.includes('q'),
-  //   }
-  // }
+  const playerCastlingString = checkCastlingAvailable(castlingString, piece, true);
 
-  // const isKingSideCastlingAllowed = availableCastlings[piece['color']]['k'];
-  // const isQueenSideCastlingAllowed = availableCastlings[piece['color']]['q'];
-
-  // const isCastlingAllowed = isKingSideCastlingAllowed || isQueenSideCastlingAllowed;
-
-  // if(isCastlingAllowed) {
-  //   let isPrevCoordinateEmpty = false;
-
-  //   checkCastlingPositions.map((move) => {
-  //     let row = piece['row'] + move[0];
-  //     let column = piece['column'] + move[1];
-  
-  //     if(!isOutOfBounds(row, column)) {
-  //       const coordinate = arrayToCoordinate(row, column);
-  
-  //       const pieceInfo = getPieceInformation(coordinate, board);
-  
-  //       if(!pieceInfo) {
-
-  //         isPrevCoordinateEmpty = true;
-  //       }
-  //     }
-
-  //     return null;
-  //   });
-  // }
-
-  // if(isCastlingAllowed) {
-  //   checkCastlingPositions.map((move) => {
-  //     let row = piece['row'] + move[0];
-  //     let column = piece['column'] + move[1];
+  if(playerCastlingString) {
+    const isKingSideCastlingAvailable = playerCastlingString.toLowerCase().includes('k');
+    const isQueenSideCastlingAvailable = playerCastlingString.toLowerCase().includes('q');
+    
+    if(isKingSideCastlingAvailable) {
       
-  //     let suggest = true;
-  //     while(suggest) {
-  //       const coordinate = arrayToCoordinate(row, column);
-  
-  //       if(board[coordinate]) {
-  //         const pieceInfo = getPieceInformation(coordinate, board);
-  
-  //         if(pieceInfo) {
-  //           suggest = false;
-  //         }
-  //       }
-  
-  //       if(suggest) {
-  //         availableMoves.push(coordinate);
-  //         row += move[0];
-  //         column += move[1];
-  //       }
-  //     }
-  
-  //     return null;
-  //   });
-  // }
+    }
 
-  // castlingMoves.map((move) => {
-  //   let row = piece['row'] + move[0];
-  //   let column = piece['column'] + move[1];
+    if(isQueenSideCastlingAvailable) {
 
-  //   if(!isOutOfBounds(row, column)) {
-  //     const coordinate = arrayToCoordinate(row, column);
-
-  //     const pieceInfo = getPieceInformation(coordinate, board);
-
-  //     if(!pieceInfo || pieceInfo['color'] !== piece['color']) {
-  //       availableMoves.push(coordinate);
-  //     }
-  //   }
-
-  //   return null;
-  // });
+    }
+  }
 
   return availableMoves;
 }
@@ -578,15 +526,55 @@ class Board extends PureComponent {
     return false;
   }
 
+  getCastingString(string, pieceInfo) {
+    if(string) {
+      let replaceString = '';
+      let replaceStringWith = '';
+
+      const rank = pieceInfo['rank'];
+  
+      if(rank === 'k') {
+        if(string.length === 4) {
+          replaceString = pieceInfo['color'] === WHITE ? string.slice(0, 2) :  string.slice(2, 4);
+        } else {
+          replaceString = string;
+        }
+
+        replaceStringWith = '';
+      }
+  
+      if(rank === 'r') {
+        const {row, column, color} = pieceInfo;
+  
+        if(row === 1 || row === 8) {
+          replaceString = column === 8 ? 'k' : 'q';
+          replaceStringWith = '-';
+
+          if(color === WHITE) {
+            replaceString = replaceString.toUpperCase();
+          }
+        }
+      }
+
+      let result = string.replace(replaceString, replaceStringWith);
+
+      return castlingReplaceStrings[result] ? castlingReplaceStrings[result] : result;
+    }
+
+    return string;
+  }
+
   onCellClick = (cellCooridinate) => {
-    const prevSelectedCell = this.getCellInformation(this.state.selectedCoordinate, this.state.board);
+    const prevSelectedCoordinate = this.state.selectedCoordinate;
+    const prevSelectedCell = this.getCellInformation(prevSelectedCoordinate, this.state.board);
     const selectedCell = this.getCellInformation(cellCooridinate, this.state.board);
     const isPlayerChessPiece = this.isPlayerChessPiece(selectedCell, this.state.playerTurn);
 
     if(!isPlayerChessPiece && prevSelectedCell) {
-      const isValid = isValidMove(this.state.selectedCoordinate, cellCooridinate, this.state.board, { enPassantPieceCoordinate: this.state.enPassantPieceCoordinate });
-      const isPawn = isValid && getPieceInformation(this.state.selectedCoordinate, this.state.board)['rank'] === 'p';
-      const enPassantPieceCoordinate = isValid && isPawn && this.isEnPassant(this.state.selectedCoordinate, cellCooridinate) ? cellCooridinate : '';
+      const isValid = isValidMove(prevSelectedCoordinate, cellCooridinate, this.state.board, { enPassantPieceCoordinate: this.state.enPassantPieceCoordinate });
+      const selectedPieceInfo = getPieceInformation(prevSelectedCoordinate, this.state.board);
+      const isPawn = isValid && selectedPieceInfo['rank'] === 'p';
+      const enPassantPieceCoordinate = isValid && isPawn && this.isEnPassant(prevSelectedCoordinate, cellCooridinate) ? cellCooridinate : '';
 
       let enPassantCooridinate = {};
 
@@ -597,21 +585,23 @@ class Board extends PureComponent {
       }
 
       if(isValid) {
+
         this.setState({
           selectedCoordinate: '',
           enPassantPieceCoordinate: enPassantPieceCoordinate,
           playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
+          castling: this.getCastingString(this.state.castling, selectedPieceInfo),
           board: {
             ...this.state.board,
             ...enPassantCooridinate,
-            [this.state.selectedCoordinate]: '',
+            [prevSelectedCoordinate]: '',
             [cellCooridinate]: prevSelectedCell,
-          }
+          },
         }, this.setOrientation);
       }
     } else {
       this.setState({
-        selectedCoordinate: this.state.selectedCoordinate === cellCooridinate ? '' : cellCooridinate,
+        selectedCoordinate: prevSelectedCoordinate === cellCooridinate ? '' : cellCooridinate,
       }, this.setOrientation);
     }
   }
@@ -658,13 +648,14 @@ class Board extends PureComponent {
     const boardPositions = isBlack ? blackBoardPositions : whiteBoardPositions;
     const pieceColorValue = isBlack ? 1 : 0;
 
+    const playerInCheck = this.state.playerInCheck;
+    const playerTurn = this.state.playerTurn;
+
     const pieceOptions = { 
       enPassantPieceCoordinate: this.state.enPassantPieceCoordinate,
-      castling: this.state.castling,
+      castling: playerInCheck === playerTurn ? '' : this.state.castling,
     };
     const selectedPieceNextMoves = getMovesByCoordinate(this.state.selectedCoordinate, this.state.board, pieceOptions);
-
-    const playerInCheck = this.state.playerInCheck;
     
     return (
       <div className="container-fluid">
@@ -704,7 +695,7 @@ class Board extends PureComponent {
           <div className="col-6">
 
             <div className="player-turn">
-              <span> <strong>{this.state.playerTurn === WHITE ? 'WHITE' : 'BLACK'}</strong> to move</span>
+              <span> <strong>{playerTurn === WHITE ? 'WHITE' : 'BLACK'}</strong> to move</span>
             </div>
 
             <div className="container">

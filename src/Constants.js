@@ -122,3 +122,14 @@ export const defaultBoardState = {
   'g8': 'bn',
   'h8': 'br',
 };
+
+export const castlingReplaceStrings = {
+  'KQ--': 'KQ',
+  'K---': 'K-',
+  '-Q--': '-Q',
+  '--kq': 'kq',
+  '--k-': 'k-',
+  '---q': '-q',
+  '----': '',
+  '--': ''
+}
