@@ -68,10 +68,14 @@ function arrayToCoordinate(_row, _column, move = [0, 0]) {
 }
 
 function getEnpassantAttackCoordinate(enPassantPieceCoordinate, board) {
-  const cellInformation = getPieceInformation(enPassantPieceCoordinate, board);
-  const rowIncrement = cellInformation['color'] === 'w' ? -1 : 1;
+  if(enPassantPieceCoordinate && board[enPassantPieceCoordinate]) {
+    const cellInformation = getPieceInformation(enPassantPieceCoordinate, board);
+    const rowIncrement = cellInformation['color'] === 'w' ? -1 : 1;
+  
+    return arrayToCoordinate(cellInformation['row'] + rowIncrement, cellInformation['column']);
+  }
 
-  return arrayToCoordinate(cellInformation['row'] + rowIncrement, cellInformation['column']);
+  return null;
 }
 
 function getPawnMoves(piece, board, enPassantPieceCoordinate) {
@@ -137,7 +141,9 @@ function getPawnMoves(piece, board, enPassantPieceCoordinate) {
     if(board[coordinate] && pieceInfo['color'] !== piece['color'] && coordinate === enPassantPieceCoordinate) {
       const attackCoordinate = getEnpassantAttackCoordinate(enPassantPieceCoordinate, board);
 
-      availableMoves.push(attackCoordinate);
+      if(attackCoordinate) {
+        availableMoves.push(attackCoordinate);
+      }
     }
 
     return null;
@@ -430,6 +436,8 @@ class Board extends PureComponent {
       enPassantPieceCoordinate: '',
       castling: 'KQkq',
       playerInCheck: null,
+      historyMoves: [],
+      showUndoButton: true,
     };
   }
 
@@ -443,6 +451,19 @@ class Board extends PureComponent {
     if(this.state.isAutoOrientation && this.orientationTimeout) {
       clearTimeout(this.orientationTimeout);
     }
+  }
+
+  initializeNewGame = () => {
+    this.setState({
+      board: defaultBoardState,
+      orientation: WHITE,
+      playerTurn: WHITE,
+      selectedCoordinate: '',
+      enPassantPieceCoordinate: '',
+      castling: 'KQkq',
+      playerInCheck: null,
+      historyMoves: [],
+    });
   }
 
   setPlayerBoard = () => {
@@ -585,6 +606,16 @@ class Board extends PureComponent {
       }
 
       if(isValid) {
+        const move = {
+          current: {
+            piece: selectedCell,
+            coordinate: cellCooridinate,
+          },
+          previous: {
+            piece: prevSelectedCell,
+            coordinate: prevSelectedCoordinate,
+          }
+        };
 
         this.setState({
           selectedCoordinate: '',
@@ -597,6 +628,7 @@ class Board extends PureComponent {
             [prevSelectedCoordinate]: '',
             [cellCooridinate]: prevSelectedCell,
           },
+          historyMoves: [ ...this.state.historyMoves, move]
         }, this.setOrientation);
       }
     } else {
@@ -613,6 +645,27 @@ class Board extends PureComponent {
           orientation: this.state.playerTurn
         });
       }, 1000);
+    }
+  }
+
+  onUndoClick = () => {
+    const historyMoves = this.state.historyMoves;
+    const historyMovesLength = historyMoves.length - 1;
+
+    if(historyMovesLength >= 0) {
+      const lastMove = historyMoves[historyMovesLength];
+
+      const { current, previous } = lastMove;
+
+      this.setState({ 
+        playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
+        board: {
+          ...this.state.board,
+          [current.coordinate]: current.piece,
+          [previous.coordinate]: previous.piece,
+        },
+        historyMoves: historyMoves.slice(0, historyMovesLength),
+      });
     }
   }
 
@@ -638,6 +691,14 @@ class Board extends PureComponent {
       return {
         showPossibleMoves: !state.showPossibleMoves,
       } 
+    });
+  }
+
+  toggleUndoButton = () => {
+    this.setState((state) => {
+      return {
+        showUndoButton: !state.showUndoButton,
+      }
     });
   }
 
@@ -689,13 +750,43 @@ class Board extends PureComponent {
                 </div>
               </div>
             </div>
-
+            <div className="form-group row">
+              <label className="col-sm-6 col-form-label">Show Undo Button</label>
+              <div className="col-sm-6">
+                <div className="form-check mt-1">
+                  <input className="form-check-input position-static" type="checkbox" checked={this.state.showUndoButton} onChange={this.toggleUndoButton} />
+                </div>
+              </div>
+            </div>
+            <div className="form-group row">
+              <div className="col-sm-12 text-center">
+                <button type="button" className="btn btn-primary btn-lg" onClick={this.initializeNewGame}>New Game</button>
+              </div>
+            </div>
           </div>
 
           <div className="col-6">
 
-            <div className="player-turn">
-              <span> <strong>{playerTurn === WHITE ? 'WHITE' : 'BLACK'}</strong> to move</span>
+            <div className="container options-nav">
+              <div className="row">
+                <div className="col-6">
+                  <div className="player-turn">
+                    <span> Player: <strong>{playerTurn === WHITE ? 'WHITE' : 'BLACK'}</strong></span>
+                  </div>
+                </div>
+
+                <div className="col-6">
+                  { 
+                    this.state.showUndoButton && (
+                      <div className="undo-button">
+                        <button onClick={this.onUndoClick}>
+                          <i className="fas fa-undo"></i>
+                        </button>
+                      </div>
+                    )
+                  }
+                </div>
+              </div>
             </div>
 
             <div className="container">
@@ -748,6 +839,7 @@ class Board extends PureComponent {
           
           <div className="col">
             <h5 className="mt-5 mb-4">Move History</h5>
+              
           </div>
         </div>
       </div>
