@@ -419,11 +419,11 @@ function isValidMove(sourceCoordinate, targetCoordinate, board, options) {
   return validMoves.includes(targetCoordinate);
 }
 
-function boardToFEN(board, playerTurn, castling, enPassant, historyMoves, halfMoveClock) {
+function boardToFEN(board, playerTurn, castling, enPassant, historyMoves, halfMoveClock, fullMoveCount) {
   const historyMovesLength = historyMoves.length;
   const historyMovesIndexLength = historyMovesLength - 1;
   const latestMove = historyMovesIndexLength >= 0 ? historyMoves[historyMovesIndexLength] : [];
-  const fullMoveCount = historyMovesIndexLength >= 0 ? ( latestMove.length === 2 ? historyMovesLength + 1 : historyMovesIndexLength + 1 ) : 1;
+  const fullMoveCount_ = historyMovesIndexLength >= 0 ? ( latestMove.length === 2 ? historyMovesLength + 1 : historyMovesIndexLength + 1 ) : fullMoveCount;
 
   let FENString = '';
 
@@ -459,18 +459,52 @@ function boardToFEN(board, playerTurn, castling, enPassant, historyMoves, halfMo
     }
   }
 
-  return `${FENString} ${playerTurn} ${castling} ${enPassant} ${halfMoveClock} ${fullMoveCount}`;
+  return {
+    FENString: `${FENString} ${playerTurn} ${castling} ${enPassant} ${halfMoveClock} ${fullMoveCount_}`,
+    fullMoveCount: fullMoveCount_
+  }
 }
 
-// function fenToBoard(string = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2') {
-//   const [ board, playerTurn, castling, enPassant, halfMoveClock, fullMoveCount ] = string.split(' ');
+function FENToBoard(string) {
+  const [ boardString, playerTurn, castling, enPassant, halfMoveClock, fullMoveCount ] = string.split(' ');
 
-//   const rows = board.split('/');
+  const rows = boardString.split('/');
 
-//   rows.map((row, inx) => {
-    
-//   });
-// }
+  const board = {};
+
+  let rowCount = 8;
+  rows.map((row, inx) => {
+    const columnPieces = row.split('');
+    const rowCoordinate = rowCount - inx;
+
+    let emptyCoordinateCount = 0;
+
+    columnPieces.map((piece, columnInx) => {
+      if(isNaN(piece)) {
+        const columnCoordinate = numToAlpha[columnInx + 1 + emptyCoordinateCount];
+        const color = piece === piece.toUpperCase() ? WHITE : BLACK;
+        const rank = piece.toLowerCase();
+  
+        board[`${columnCoordinate}${rowCoordinate}`] = `${color}${rank}`;
+      } else {
+        emptyCoordinateCount = Number(piece) - 1;
+      }
+
+      return null;
+    });
+
+    return null;
+  });
+
+  return {
+    board: board,
+    playerTurn: playerTurn,
+    castling: castling,
+    enPassantPieceCoordinate: enPassant === '-' ? '' : enPassant,
+    fullMoveCount: fullMoveCount,
+    halfMoveClock: halfMoveClock
+  }
+}
 
 class Board extends PureComponent {
   orientationTimeout = null;
@@ -491,12 +525,16 @@ class Board extends PureComponent {
       playerInCheck: null,
       historyMoves: [],
       showUndoButton: true,
+      FENString: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      fullMoveCount: 1,
+      halfMoveClock: 0,
     };
   }
 
   componentDidUpdate(prevProps, prevState) {
     if(this.state.selectedCoordinate === '' && prevState.selectedCoordinate !== this.state.selectedCoordinate) {
       this.validateKingInCheck();
+      this.updateFEN();
     }
   }
 
@@ -505,6 +543,8 @@ class Board extends PureComponent {
       clearTimeout(this.orientationTimeout);
     }
   }
+
+  historyMoves = [];
 
   initializeNewGame = () => {
     this.setState({
@@ -516,6 +556,7 @@ class Board extends PureComponent {
       castling: 'KQkq',
       playerInCheck: null,
       historyMoves: [],
+      FENString: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     });
   }
 
@@ -540,7 +581,7 @@ class Board extends PureComponent {
     const allCoordinates = getAllCoordinatesByPlayer(null, this.state.board);
 
     let isPlayerInCheck = false;
-    let pieceInfoByCheck = null; // Piece Info that put opponent player in check
+    // let pieceInfoByCheck = null; // Piece Info that put opponent player in check
     let pieceInfoInCheck = null; // Piece Info that in check
 
     allCoordinates.map((_coordinate) => {
@@ -552,7 +593,7 @@ class Board extends PureComponent {
 
         if(movePieceInfo && movePieceInfo['rank'] === 'k' && movePieceInfo['color'] !== coordinatePieceInfo['color']) {
           isPlayerInCheck = true;
-          pieceInfoByCheck = coordinatePieceInfo;
+          // pieceInfoByCheck = coordinatePieceInfo;
           pieceInfoInCheck = movePieceInfo;
         }
 
@@ -673,8 +714,6 @@ class Board extends PureComponent {
           }
         };
 
-        console.log(enPassantPieceCoordinate, move);
-
         this.setState({
           selectedCoordinate: '',
           enPassantPieceCoordinate: enPassantPieceCoordinate,
@@ -733,8 +772,23 @@ class Board extends PureComponent {
         },
         enPassantPieceCoordinate: current.enPassant ? current.enPassant : '',
         historyMoves: historyMoves.slice(0, historyMovesLength),
-      });
+      }, this.updateFEN);
     }
+  }
+
+  updateFEN = () => {
+    const { historyMoves, halfMoveClock } = this.getHistoryMoves(this.state.halfMoveClock);
+
+    const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : '-';
+    const { FENString, fullMoveCount } = boardToFEN(this.state.board, this.state.playerTurn, this.state.castling, enPassantAttackCoordinate, historyMoves, halfMoveClock, this.state.fullMoveCount);
+
+    this.historyMoves = historyMoves;
+
+    this.setState({
+      FENString: FENString,
+      halfMoveClock: halfMoveClock,
+      fullMoveCount: fullMoveCount
+    })
   }
 
   onThemeChange = (event) => {
@@ -770,10 +824,10 @@ class Board extends PureComponent {
     });
   }
 
-  getHistoryMoves = () => {
+  getHistoryMoves = (halfMoveClockCount) => {
     const historyMoves = [];
 
-    let halfMoveClock = 0;
+    let halfMoveClock = halfMoveClockCount;
 
     this.state.historyMoves.map((historyMove, inx) => {
       const isFullMove = inx % 2 === 0;
@@ -811,6 +865,38 @@ class Board extends PureComponent {
     return { historyMoves, halfMoveClock };
   }
 
+  copyToClipboard = () => {
+    const copyText = document.getElementById('fen-string');
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+
+    const tooltip = document.getElementById('copy-button');
+    const tooltipId = tooltip.getAttribute('aria-describedby');
+    const tooltipHTML = document.getElementById(tooltipId);
+    tooltipHTML.innerHTML = tooltipHTML.innerHTML.replace('Copy to Clipboard', 'Copied!')
+  }
+
+  loadFEN = () => {
+    const copyText = document.getElementById('fen-string');
+    const value = copyText.value;
+
+    const boardDetails = FENToBoard(value);
+
+    this.setState({
+      ...this.state,
+      ...boardDetails,
+    });
+  }
+
+  onFENChange = (event) => {
+    event.preventDefault();
+
+    this.setState({
+      FENString: event.target.value
+    })
+  }
+
   render() {
     const board = this.state.board;
 
@@ -827,10 +913,7 @@ class Board extends PureComponent {
     };
     const selectedPieceNextMoves = getMovesByCoordinate(this.state.selectedCoordinate, this.state.board, pieceOptions);
 
-    const { historyMoves, halfMoveClock } = this.getHistoryMoves();
-
     const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : '-';
-    const FENString = boardToFEN(this.state.board, playerTurn, this.state.castling, enPassantAttackCoordinate, historyMoves, halfMoveClock);
     
     return (
       <div className="container-fluid">
@@ -876,10 +959,7 @@ class Board extends PureComponent {
               <div className="col-sm-12 text-center">
                 <button type="button" className="btn btn-primary btn-lg" onClick={this.initializeNewGame}>New Game</button>
               </div>
-            </div>  
-
-            <p>FENString: </p>
-            <p className="fen-string">{ FENString }</p>
+            </div>
           </div>
 
           <div className="col-6">
@@ -952,13 +1032,27 @@ class Board extends PureComponent {
                 })}
               </div>
             </div>
+
+            <div className="container fen-details">
+              <div className="form-group">
+                <label>FEN String: </label>
+                <div className="input-group">
+                  <input id="fen-string" type="text" className="form-control" value={this.state.FENString} onChange={this.onFENChange}  />
+                  <div className="input-group-append">
+                    <button type="button" id="copy-button" className="btn input-group-text" data-toggle="tooltip" data-placement="right" title="Copy to Clipboard" onClick={this.copyToClipboard}>Copy</button>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" className="btn btn-primary" onClick={this.loadFEN}>Load</button>
+            </div>
           </div>
           
           <div className="col">
             <h5 className="mt-5 mb-4">Move History</h5>
               <ol className="move-history">
                 {
-                  historyMoves.map((fullMove, inx) => {
+                  this.historyMoves.map((fullMove, inx) => {
                     return (
                       <li key={inx}>
                         {
