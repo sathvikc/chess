@@ -9,7 +9,15 @@ body {
 }
 
 .pointer {
-  cursor: pointer;
+  cursor: pointer !important;
+}
+
+.not-allowed {
+  cursor: not-allowed;
+}
+
+.fen-string {
+  font-size: 14px;
 }
 
 .options-nav {
@@ -35,6 +43,23 @@ body {
 .player-turn {
   font-size: 20px;
   margin-bottom: 10px;
+}
+
+.move-history {
+  padding-left: 30px;
+  background-color: white;
+  height: 500px;
+  width: 280px;
+  overflow: auto;
+
+  & * {
+    color: black;
+  }
+
+  & .white-move {
+    width: 70px;
+    display: inline-block;
+  }
 }
 
 /* ========= BOARD STYLES - START ========= */

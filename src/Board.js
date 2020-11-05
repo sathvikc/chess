@@ -419,6 +419,59 @@ function isValidMove(sourceCoordinate, targetCoordinate, board, options) {
   return validMoves.includes(targetCoordinate);
 }
 
+function boardToFEN(board, playerTurn, castling, enPassant, historyMoves, halfMoveClock) {
+  const historyMovesLength = historyMoves.length;
+  const historyMovesIndexLength = historyMovesLength - 1;
+  const latestMove = historyMovesIndexLength >= 0 ? historyMoves[historyMovesIndexLength] : [];
+  const fullMoveCount = historyMovesIndexLength >= 0 ? ( latestMove.length === 2 ? historyMovesLength + 1 : historyMovesIndexLength + 1 ) : 1;
+
+  let FENString = '';
+
+  for(let row = 8; row >= 1; row--) {
+    let emptyCoordinateCount = 0;
+
+    for(let column = 1; column <= 8; column++) {
+      const columnName = numToAlpha[column];
+      const coordinate = `${columnName}${row}`;
+
+      const pieceInfo = getPieceInformation(coordinate, board);
+
+      if(pieceInfo) {
+        const rank = pieceInfo['color'] === WHITE ? pieceInfo['rank'].toUpperCase() : pieceInfo['rank'];
+        FENString = emptyCoordinateCount > 0 ? FENString + emptyCoordinateCount + rank : FENString + rank;
+        emptyCoordinateCount = 0;
+      } else {
+        emptyCoordinateCount++;
+
+        if(emptyCoordinateCount === 8) {
+          FENString += emptyCoordinateCount;
+          emptyCoordinateCount = 0;
+        }
+      }
+    }
+
+    if(emptyCoordinateCount) {
+      FENString+= emptyCoordinateCount;
+    }
+
+    if(row !== 1) {
+      FENString+= '/';
+    }
+  }
+
+  return `${FENString} ${playerTurn} ${castling} ${enPassant} ${halfMoveClock} ${fullMoveCount}`;
+}
+
+// function fenToBoard(string = 'rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2') {
+//   const [ board, playerTurn, castling, enPassant, halfMoveClock, fullMoveCount ] = string.split(' ');
+
+//   const rows = board.split('/');
+
+//   rows.map((row, inx) => {
+    
+//   });
+// }
+
 class Board extends PureComponent {
   orientationTimeout = null;
 
@@ -599,7 +652,9 @@ class Board extends PureComponent {
 
       let enPassantCooridinate = {};
 
-      if(this.state.enPassantPieceCoordinate && cellCooridinate === getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board)) {
+      const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : null;
+      const isEnPassantAttack = cellCooridinate === enPassantAttackCoordinate;
+      if(isEnPassantAttack) {
         enPassantCooridinate = {
           [this.state.enPassantPieceCoordinate]: '',
         }
@@ -608,14 +663,17 @@ class Board extends PureComponent {
       if(isValid) {
         const move = {
           current: {
-            piece: selectedCell,
+            piece: isEnPassantAttack ? this.state.board[this.state.enPassantPieceCoordinate] : selectedCell,
             coordinate: cellCooridinate,
+            enPassant: isEnPassantAttack ? this.state.enPassantPieceCoordinate : null,
           },
           previous: {
             piece: prevSelectedCell,
             coordinate: prevSelectedCoordinate,
           }
         };
+
+        console.log(enPassantPieceCoordinate, move);
 
         this.setState({
           selectedCoordinate: '',
@@ -657,13 +715,23 @@ class Board extends PureComponent {
 
       const { current, previous } = lastMove;
 
+      let clearEnPassant = {};
+
+      if(current.enPassant) {
+        clearEnPassant = {
+          [current.coordinate]: '',
+        }
+      }
+
       this.setState({ 
         playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
         board: {
           ...this.state.board,
-          [current.coordinate]: current.piece,
+          [current.enPassant || current.coordinate]: current.piece,
           [previous.coordinate]: previous.piece,
+          ...clearEnPassant,
         },
+        enPassantPieceCoordinate: current.enPassant ? current.enPassant : '',
         historyMoves: historyMoves.slice(0, historyMovesLength),
       });
     }
@@ -702,6 +770,47 @@ class Board extends PureComponent {
     });
   }
 
+  getHistoryMoves = () => {
+    const historyMoves = [];
+
+    let halfMoveClock = 0;
+
+    this.state.historyMoves.map((historyMove, inx) => {
+      const isFullMove = inx % 2 === 0;
+
+      const { current, previous } = historyMove;
+
+      let move = current.coordinate;
+
+      halfMoveClock++;
+
+      if(previous.piece && previous.piece[1] === 'p') {
+        halfMoveClock = 0;
+      }
+
+      // Attach Notation
+      if(current.piece[0] && current.piece[0] !== previous.piece[0]) {
+        move = previous.coordinate[0] + 'x' + move;
+        halfMoveClock = 0;
+      }
+
+      // If selected piece is other than Pawn
+      if(previous.piece && previous.piece[1] !== 'p') {
+        move = previous.piece[1].toUpperCase() + ( move.includes('x') ? move.slice(1) : move );
+      }
+
+      if(isFullMove) {
+        historyMoves.push([ move ]);
+      } else {
+        historyMoves[historyMoves.length - 1].push(move);
+      }
+
+      return null;
+    });
+
+    return { historyMoves, halfMoveClock };
+  }
+
   render() {
     const board = this.state.board;
 
@@ -717,6 +826,11 @@ class Board extends PureComponent {
       castling: playerInCheck === playerTurn ? '' : this.state.castling,
     };
     const selectedPieceNextMoves = getMovesByCoordinate(this.state.selectedCoordinate, this.state.board, pieceOptions);
+
+    const { historyMoves, halfMoveClock } = this.getHistoryMoves();
+
+    const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : '-';
+    const FENString = boardToFEN(this.state.board, playerTurn, this.state.castling, enPassantAttackCoordinate, historyMoves, halfMoveClock);
     
     return (
       <div className="container-fluid">
@@ -762,7 +876,10 @@ class Board extends PureComponent {
               <div className="col-sm-12 text-center">
                 <button type="button" className="btn btn-primary btn-lg" onClick={this.initializeNewGame}>New Game</button>
               </div>
-            </div>
+            </div>  
+
+            <p>FENString: </p>
+            <p className="fen-string">{ FENString }</p>
           </div>
 
           <div className="col-6">
@@ -808,7 +925,7 @@ class Board extends PureComponent {
 
                         const isChessPiece = board[cellCooridinate] ? true : false;
                         const isPlayerChessPiece = this.isPlayerChessPiece(chessPiece);
-                        const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? cellCooridinate === getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) || this.isOpponentChessPiece(chessPiece) : this.isOpponentChessPiece(chessPiece);
+                        const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? cellCooridinate === enPassantAttackCoordinate || this.isOpponentChessPiece(chessPiece) : this.isOpponentChessPiece(chessPiece);
                         const isActive = this.state.selectedCoordinate === cellCooridinate;
                         const isPossibleMove = selectedPieceNextMoves.includes(cellCooridinate);
                         const isClickable = isPlayerChessPiece || isPossibleMove;
@@ -818,7 +935,7 @@ class Board extends PureComponent {
                         return (
                           <button 
                             key={cellId} 
-                            className={`cell ${cellColor} ${isClickable ? 'pointer' : ''} ${isActive ? 'active' : ''} ${isPlayerKing ? 'check' : ''}`}
+                            className={`cell ${cellColor} ${isClickable ? 'pointer' : 'not-allowed'} ${isActive ? 'active' : ''} ${isPlayerKing ? 'check' : ''}`}
                             onClick={() => { this.onCellClick(cellCooridinate); }}
                             disabled={!isClickable}
                           >
@@ -839,7 +956,21 @@ class Board extends PureComponent {
           
           <div className="col">
             <h5 className="mt-5 mb-4">Move History</h5>
-              
+              <ol className="move-history">
+                {
+                  historyMoves.map((fullMove, inx) => {
+                    return (
+                      <li key={inx}>
+                        {
+                          fullMove.map((move, moveInx) => {
+                            return <span key={moveInx} className={moveInx === 0 ? 'white-move' : 'black-move'}>{move}</span>;
+                          })
+                        }
+                      </li>
+                    )
+                  })
+                }
+              </ol>
           </div>
         </div>
       </div>
