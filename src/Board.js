@@ -472,14 +472,17 @@ function FENToBoard(string) {
 
   const board = {};
 
+  // 1K2br1P
+
   let rowCount = 8;
   rows.map((row, inx) => {
     const columnPieces = row.split('');
     const rowCoordinate = rowCount - inx;
 
     let emptyCoordinateCount = 0;
-
+    console.log('-=========');
     columnPieces.map((piece, columnInx) => {
+      console.log(piece, columnInx, 1, emptyCoordinateCount);
       if(isNaN(piece)) {
         const columnCoordinate = numToAlpha[columnInx + 1 + emptyCoordinateCount];
         const color = piece === piece.toUpperCase() ? WHITE : BLACK;
@@ -487,7 +490,7 @@ function FENToBoard(string) {
   
         board[`${columnCoordinate}${rowCoordinate}`] = `${color}${rank}`;
       } else {
-        emptyCoordinateCount = Number(piece) - 1;
+        emptyCoordinateCount = emptyCoordinateCount + Number(piece) - 1;
       }
 
       return null;
