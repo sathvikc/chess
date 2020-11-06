@@ -521,6 +521,7 @@ class Board extends PureComponent {
       playerTurn: WHITE,
       selectedCoordinate: '',
       enPassantPieceCoordinate: '',
+      promotionCoordinate: '',
       castling: 'KQkq',
       playerInCheck: null,
       historyMoves: [],
@@ -556,7 +557,10 @@ class Board extends PureComponent {
       castling: 'KQkq',
       playerInCheck: null,
       historyMoves: [],
+      promotionCoordinate: '',
       FENString: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      fullMoveCount: 1,
+      halfMoveClock: 0,
     });
   }
 
@@ -641,7 +645,7 @@ class Board extends PureComponent {
     return false;
   }
 
-  getCastingString(string, pieceInfo) {
+  getCastingString = (string, pieceInfo) => {
     if(string) {
       let replaceString = '';
       let replaceStringWith = '';
@@ -679,6 +683,22 @@ class Board extends PureComponent {
     return string;
   }
 
+  checkPawnPromotion = (pieceInfo, selectedCell) => {
+    const color = pieceInfo['color'];
+    const { row } = getCoordinateInformation(selectedCell);
+
+    if(
+        (color === BLACK && row === 1) 
+        || (color === WHITE && row === 8)
+    ) {
+      return true;
+    }
+
+    // rnbqkbnr/pPpp1ppp/8/8/8/8/1PPPPpPP/RNBQKBNR w KQkq - 0 5
+
+    return false;
+  }
+
   onCellClick = (cellCooridinate) => {
     const prevSelectedCoordinate = this.state.selectedCoordinate;
     const prevSelectedCell = this.getCellInformation(prevSelectedCoordinate, this.state.board);
@@ -714,6 +734,8 @@ class Board extends PureComponent {
           }
         };
 
+        const isPawnPromotion = isPawn && this.checkPawnPromotion(selectedPieceInfo, cellCooridinate) ? cellCooridinate : '';
+
         this.setState({
           selectedCoordinate: '',
           enPassantPieceCoordinate: enPassantPieceCoordinate,
@@ -725,7 +747,8 @@ class Board extends PureComponent {
             [prevSelectedCoordinate]: '',
             [cellCooridinate]: prevSelectedCell,
           },
-          historyMoves: [ ...this.state.historyMoves, move]
+          historyMoves: [ ...this.state.historyMoves, move],
+          promotionCoordinate: isPawnPromotion
         }, this.setOrientation);
       }
     } else {
@@ -897,6 +920,47 @@ class Board extends PureComponent {
     })
   }
 
+  onSelectPromotion(piece) {
+    this.setState({
+      ...this.state,
+      board: {
+        ...this.state.board,
+        [this.state.promotionCoordinate]: piece,
+      },
+      promotionCoordinate: ''
+    }, this.updateFEN);
+  }
+
+  renderPawnPromotionModal = (coordinate) => {
+    const pieceInfo = getPieceInformation(coordinate, this.state.board);
+
+    if(pieceInfo) {
+      const { color } = pieceInfo;
+
+      const queen = `${color}q`;
+      const rook = `${color}r`;
+      const knight = `${color}n`;
+      const bishop = `${color}b`;
+
+      return (
+        <div className="pawn-promotion-option">
+          <button className="option" onClick={() => this.onSelectPromotion(queen)}>
+            <img src={pieceImages[queen]} className="piece-img" alt="chess piece" />
+          </button>
+          <button className="option" onClick={() => this.onSelectPromotion(rook)}>
+            <img src={pieceImages[rook]} className="piece-img" alt="chess piece" />
+          </button>
+          <button className="option" onClick={() => this.onSelectPromotion(knight)}>
+            <img src={pieceImages[knight]} className="piece-img" alt="chess piece" />
+          </button>
+          <button className="option" onClick={() => this.onSelectPromotion(bishop)}>
+            <img src={pieceImages[bishop]} className="piece-img" alt="chess piece" />
+          </button>
+        </div>
+      );
+    }
+  }
+
   render() {
     const board = this.state.board;
 
@@ -914,6 +978,7 @@ class Board extends PureComponent {
     const selectedPieceNextMoves = getMovesByCoordinate(this.state.selectedCoordinate, this.state.board, pieceOptions);
 
     const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : '-';
+    const promotionCoordinate = this.state.promotionCoordinate;
     
     return (
       <div className="container-fluid">
@@ -987,6 +1052,9 @@ class Board extends PureComponent {
             </div>
 
             <div className="container">
+
+              { this.renderPawnPromotionModal(promotionCoordinate) }
+
               <div className={`board ${this.state.theme}`}>
                 {boardPositions.map((cellPositions, index) => {
                   index = isBlack ? index + 1 : (index - 8) * -1;
@@ -995,7 +1063,7 @@ class Board extends PureComponent {
                   const rowPosition = index;
 
                   return (
-                    <div className="board-row" key={rowId}>
+                    <div className={`board-row ${promotionCoordinate ? 'opacity' : ''}`} key={rowId}>
                       {cellPositions.map((cellPosition, inx) => {
                         const cellId = `cell-${cellPosition}`;
                         const cellColor = (rowPosition + inx + pieceColorValue) % 2 === 1 ? 'black' : 'white';

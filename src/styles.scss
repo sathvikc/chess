@@ -77,6 +77,45 @@ body {
   }
 }
 
+.opacity {
+  opacity: 0.3;
+}
+
+.pawn-promotion-option {
+  width: 32rem;
+  height: 32rem;
+  line-height: 480px;
+  position: absolute;
+  background: transparent;
+  text-align: center;
+  font-size: 90px;
+  cursor: default;
+  z-index: 10;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -57%);
+
+  & button.option {
+    position: relative;
+    width: 5rem;
+    height: 5rem;
+    text-align: center;
+    border: 0;
+    padding: 0;
+    outline: none;
+    margin-right: 20px;
+    background-color: transparent;
+
+    & .piece-img {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  }
+}
+
 /* ========= BOARD STYLES - START ========= */
 .board {
   &.light {
