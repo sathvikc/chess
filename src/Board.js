@@ -306,8 +306,6 @@ function checkCastlingAvailable(castlingString, piece, returnString = false) {
 
 function getKingMoves(piece, board, castlingString) {
   const possibleMoves = [ [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 1], [0, -1], [1, 0], [-1, 0] ];
-  // const castlingMoves = [ [0, 2], [0, -2] ];
-  // const checkCastlingPositions = [ [0, 1], [0, -1] ];
 
   const availableMoves = [];
 
@@ -333,13 +331,31 @@ function getKingMoves(piece, board, castlingString) {
   if(playerCastlingString) {
     const isKingSideCastlingAvailable = playerCastlingString.toLowerCase().includes('k');
     const isQueenSideCastlingAvailable = playerCastlingString.toLowerCase().includes('q');
+
+    const row = piece['row'];
+    const column = piece['column'];
     
     if(isKingSideCastlingAvailable) {
-      
+      if (
+        !board[arrayToCoordinate(row, column + 1)]
+        && !board[arrayToCoordinate(row, column + 2)]
+      ) {
+        const coordinate = arrayToCoordinate(row, column + 2);
+
+        availableMoves.push(coordinate)
+      }
     }
 
     if(isQueenSideCastlingAvailable) {
+      if (
+        !board[arrayToCoordinate(row, column - 1)]
+        && !board[arrayToCoordinate(row, column - 2)]
+        && !board[arrayToCoordinate(row, column - 3)]
+      ) {
+        const coordinate = arrayToCoordinate(row, column - 2);
 
+        availableMoves.push(coordinate)
+      }
     }
   }
 
@@ -472,17 +488,15 @@ function FENToBoard(string) {
 
   const board = {};
 
-  // 1K2br1P
-
   let rowCount = 8;
   rows.map((row, inx) => {
     const columnPieces = row.split('');
     const rowCoordinate = rowCount - inx;
 
     let emptyCoordinateCount = 0;
-    console.log('-=========');
+
     columnPieces.map((piece, columnInx) => {
-      console.log(piece, columnInx, 1, emptyCoordinateCount);
+
       if(isNaN(piece)) {
         const columnCoordinate = numToAlpha[columnInx + 1 + emptyCoordinateCount];
         const color = piece === piece.toUpperCase() ? WHITE : BLACK;
@@ -697,7 +711,22 @@ class Board extends PureComponent {
       return true;
     }
 
-    // rnbqkbnr/pPpp1ppp/8/8/8/8/1PPPPpPP/RNBQKBNR w KQkq - 0 5
+    return false;
+  }
+
+  checkCastlingPerformed = (prevCoordinate, coordinate) => {
+    const prevPieceInfo = getCoordinateInformation(prevCoordinate);
+    const pieceInfo = getCoordinateInformation(coordinate);
+
+    const columnMovementDiff = pieceInfo['column'] - prevPieceInfo['column'];
+
+    if(columnMovementDiff === 2) {
+      return 'k';
+    }
+
+    if(columnMovementDiff === -2) {
+      return 'q';
+    }
 
     return false;
   }
@@ -707,29 +736,64 @@ class Board extends PureComponent {
     const prevSelectedCell = this.getCellInformation(prevSelectedCoordinate, this.state.board);
     const selectedCell = this.getCellInformation(cellCooridinate, this.state.board);
     const isPlayerChessPiece = this.isPlayerChessPiece(selectedCell, this.state.playerTurn);
-
+    const cellInfo = getCoordinateInformation(cellCooridinate);
+    
     if(!isPlayerChessPiece && prevSelectedCell) {
-      const isValid = isValidMove(prevSelectedCoordinate, cellCooridinate, this.state.board, { enPassantPieceCoordinate: this.state.enPassantPieceCoordinate });
-      const selectedPieceInfo = getPieceInformation(prevSelectedCoordinate, this.state.board);
-      const isPawn = isValid && selectedPieceInfo['rank'] === 'p';
-      const enPassantPieceCoordinate = isValid && isPawn && this.isEnPassant(prevSelectedCoordinate, cellCooridinate) ? cellCooridinate : '';
-
-      let enPassantCooridinate = {};
-
-      const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : null;
-      const isEnPassantAttack = cellCooridinate === enPassantAttackCoordinate;
-      if(isEnPassantAttack) {
-        enPassantCooridinate = {
-          [this.state.enPassantPieceCoordinate]: '',
-        }
-      }
+      const isValid = isValidMove(prevSelectedCoordinate, cellCooridinate, this.state.board, { enPassantPieceCoordinate: this.state.enPassantPieceCoordinate, castling: this.state.castling });
 
       if(isValid) {
+        const selectedPieceInfo = getPieceInformation(prevSelectedCoordinate, this.state.board);
+        
+        // En Passant
+        const isPawn = selectedPieceInfo['rank'] === 'p';
+        const enPassantPieceCoordinate = isPawn && this.isEnPassant(prevSelectedCoordinate, cellCooridinate) ? cellCooridinate : '';
+
+        let enPassantCooridinate = {};
+
+        const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : null;
+        const isEnPassantAttack = cellCooridinate === enPassantAttackCoordinate;
+        if(isEnPassantAttack) {
+          enPassantCooridinate = {
+            [this.state.enPassantPieceCoordinate]: '',
+          }
+        }
+
+        // Castling
+        const isKing = selectedPieceInfo['rank'] === 'k';
+        const castlingPerformed = isKing && this.checkCastlingPerformed(prevSelectedCoordinate, cellCooridinate);
+        
+        let castleRook = {};
+
+        if(castlingPerformed) {
+          if(castlingPerformed === 'k') {
+            const rookCoordinate = arrayToCoordinate(cellInfo['row'], 8);
+            const newRookCoordinate = arrayToCoordinate(cellInfo['row'], 6);
+
+            castleRook = {
+              [rookCoordinate]: '',
+              [newRookCoordinate]: this.state.board[rookCoordinate]
+            }
+          }
+
+          if(castlingPerformed === 'q') {
+            const rookCoordinate = arrayToCoordinate(cellInfo['row'], 1);
+            const newRookCoordinate = arrayToCoordinate(cellInfo['row'], 4);
+
+            castleRook = {
+              [rookCoordinate]: '',
+              [newRookCoordinate]: this.state.board[rookCoordinate]
+            }
+          }
+        }
+        
+        // Move history
         const move = {
           current: {
             piece: isEnPassantAttack ? this.state.board[this.state.enPassantPieceCoordinate] : selectedCell,
             coordinate: cellCooridinate,
             enPassant: isEnPassantAttack ? this.state.enPassantPieceCoordinate : null,
+            castling: this.state.castling,
+            castlingPerformed: castlingPerformed,
           },
           previous: {
             piece: prevSelectedCell,
@@ -747,6 +811,7 @@ class Board extends PureComponent {
           board: {
             ...this.state.board,
             ...enPassantCooridinate,
+            ...castleRook,
             [prevSelectedCoordinate]: '',
             [cellCooridinate]: prevSelectedCell,
           },
@@ -788,14 +853,41 @@ class Board extends PureComponent {
         }
       }
 
+      let castleRook = {};
+      if(current.castlingPerformed) {
+        const cellInfo = getCoordinateInformation(current.coordinate);
+
+        if(current.castlingPerformed === 'k') {
+          const rookCoordinate = arrayToCoordinate(cellInfo['row'], 6);
+          const newRookCoordinate = arrayToCoordinate(cellInfo['row'], 8);
+
+          castleRook = {
+            [rookCoordinate]: '',
+            [newRookCoordinate]: this.state.board[rookCoordinate]
+          }
+        }
+
+        if(current.castlingPerformed === 'q') {
+          const rookCoordinate = arrayToCoordinate(cellInfo['row'], 4);
+          const newRookCoordinate = arrayToCoordinate(cellInfo['row'], 1);
+
+          castleRook = {
+            [rookCoordinate]: '',
+            [newRookCoordinate]: this.state.board[rookCoordinate]
+          }
+        }
+      }
+
       this.setState({ 
         playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
         board: {
           ...this.state.board,
+          ...clearEnPassant,
+          ...castleRook,
           [current.enPassant || current.coordinate]: current.piece,
           [previous.coordinate]: previous.piece,
-          ...clearEnPassant,
         },
+        castling: current.castling || this.state.castling,
         enPassantPieceCoordinate: current.enPassant ? current.enPassant : '',
         historyMoves: historyMoves.slice(0, historyMovesLength),
       }, this.updateFEN);
@@ -877,6 +969,17 @@ class Board extends PureComponent {
       // If selected piece is other than Pawn
       if(previous.piece && previous.piece[1] !== 'p') {
         move = previous.piece[1].toUpperCase() + ( move.includes('x') ? move.slice(1) : move );
+      }
+
+      // Castling 
+      if(current.castlingPerformed) {
+        if(current.castlingPerformed === 'k') {
+          move = '0-0';
+        }
+
+        if(current.castlingPerformed === 'q') {
+          move = '0-0-0';
+        }
       }
 
       if(isFullMove) {
