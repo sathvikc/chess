@@ -81,7 +81,8 @@ body {
   opacity: 0.3;
 }
 
-.pawn-promotion-option {
+.pawn-promotion-option,
+.check-mate {
   width: 32rem;
   height: 32rem;
   line-height: 480px;
@@ -94,6 +95,10 @@ body {
   top: 50%;
   right: 50%;
   transform: translate(50%, -57%);
+
+  &.small {
+    font-size: 55px;
+  }
 
   & button.option {
     position: relative;

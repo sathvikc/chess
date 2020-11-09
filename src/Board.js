@@ -1,6 +1,9 @@
 import React, { PureComponent } from 'react';
 
 import { players, defaultBoardState, pieceImages, castlingReplaceStrings } from './Constants';
+import Chess from './Chess';
+
+const chess = new Chess();
 
 const { WHITE, BLACK } = players;
 
@@ -28,26 +31,6 @@ const blackBoardPositions = [
 
 const alphaToNum = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8};
 const numToAlpha = { 1: 'a', 2: 'b', 3: 'c', 4: 'd', 5: 'e', 6: 'f', 7: 'g', 8: 'h' };
-
-function getAllCoordinatesByPlayer(player, board) {
-  const boardCoordinates = Object.keys(board);
-
-  if(!player) {
-    return boardCoordinates;
-  }
-
-  const coordinates = [];
-
-  boardCoordinates.map((coordinate) => {
-    if(board[coordinate].startsWith(player)) {
-      coordinates.push(coordinate);
-    }
-
-    return null;
-  });
-
-  return coordinates;
-}
 
 function isOutOfBounds(row, column) {
   return ( row < 1 || row > 8 || column < 1 || column > 8 );
@@ -529,6 +512,8 @@ class Board extends PureComponent {
   constructor() {
     super();
 
+    const defaultFENString = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
     this.state = {
       theme: 'light',
       board: defaultBoardState,
@@ -543,15 +528,17 @@ class Board extends PureComponent {
       playerInCheck: null,
       historyMoves: [],
       showUndoButton: true,
-      FENString: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      FENString: defaultFENString,
       fullMoveCount: 1,
       halfMoveClock: 0,
+      checkMate: null,
     };
+
+    chess.load(defaultFENString);
   }
 
   componentDidUpdate(prevProps, prevState) {
     if(this.state.selectedCoordinate === '' && prevState.selectedCoordinate !== this.state.selectedCoordinate) {
-      this.validateKingInCheck();
       this.updateFEN();
     }
   }
@@ -565,6 +552,8 @@ class Board extends PureComponent {
   historyMoves = [];
 
   initializeNewGame = () => {
+    const defaultFENString = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
     this.setState({
       board: defaultBoardState,
       orientation: WHITE,
@@ -575,10 +564,15 @@ class Board extends PureComponent {
       playerInCheck: null,
       historyMoves: [],
       promotionCoordinate: '',
-      FENString: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      FENString: defaultFENString,
       fullMoveCount: 1,
       halfMoveClock: 0,
+      checkMate: null,
     });
+
+    this.historyMoves = [];
+
+    chess.load(defaultFENString);
   }
 
   setPlayerBoard = () => {
@@ -596,47 +590,6 @@ class Board extends PureComponent {
     const chessPiece =  board ? board[cellCooridinate] : this.state.board[cellCooridinate];
 
     return chessPiece || '';
-  }
-
-  validateKingInCheck = () => {
-    const allCoordinates = getAllCoordinatesByPlayer(null, this.state.board);
-
-    let isPlayerInCheck = false;
-    // let pieceInfoByCheck = null; // Piece Info that put opponent player in check
-    let pieceInfoInCheck = null; // Piece Info that in check
-
-    allCoordinates.map((_coordinate) => {
-      const moves = getMovesByCoordinate(_coordinate, this.state.board);
-      const coordinatePieceInfo = getPieceInformation(_coordinate, this.state.board);
-
-      moves.map((move) => {
-        const movePieceInfo = getPieceInformation(move, this.state.board);
-
-        if(movePieceInfo && movePieceInfo['rank'] === 'k' && movePieceInfo['color'] !== coordinatePieceInfo['color']) {
-          isPlayerInCheck = true;
-          // pieceInfoByCheck = coordinatePieceInfo;
-          pieceInfoInCheck = movePieceInfo;
-        }
-
-        return null;
-      });
-
-      return null;
-    });
-
-    if(isPlayerInCheck) {
-      this.setState({
-        playerInCheck: pieceInfoInCheck['color'],
-      });
-    }
-
-    if(!isPlayerInCheck && this.state.playerInCheck) {
-      this.setState({
-        playerInCheck: null,
-      });
-    }
-
-    return isPlayerInCheck;
   }
 
   isPlayerChessPiece = (chessPiece = '', playerTurn = this.state.playerTurn) => {
@@ -794,6 +747,7 @@ class Board extends PureComponent {
             enPassant: isEnPassantAttack ? this.state.enPassantPieceCoordinate : null,
             castling: this.state.castling,
             castlingPerformed: castlingPerformed,
+            inCheck: false,
           },
           previous: {
             piece: prevSelectedCell,
@@ -803,7 +757,8 @@ class Board extends PureComponent {
 
         const isPawnPromotion = isPawn && this.checkPawnPromotion(selectedPieceInfo, cellCooridinate) ? cellCooridinate : '';
 
-        this.setState({
+        const newState = {
+          ...this.state,
           selectedCoordinate: '',
           enPassantPieceCoordinate: enPassantPieceCoordinate,
           playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
@@ -815,9 +770,25 @@ class Board extends PureComponent {
             [prevSelectedCoordinate]: '',
             [cellCooridinate]: prevSelectedCell,
           },
-          historyMoves: [ ...this.state.historyMoves, move],
           promotionCoordinate: isPawnPromotion
-        }, this.setOrientation);
+        };
+
+        const v = chess.move({ from: move.previous.coordinate, to: move.current.coordinate });
+
+        if(chess.in_check()) {
+          newState.playerInCheck = chess.turn();
+          move.current.inCheck = true;
+        } else {
+          newState.playerInCheck = null;
+        }
+
+        if(v === null || chess.game_over()) {
+          newState.checkMate = chess.turn();
+        }
+
+        newState.historyMoves = [ ...this.state.historyMoves, move];
+
+        this.setState(newState, this.setOrientation);
       }
     } else {
       this.setState({
@@ -878,7 +849,7 @@ class Board extends PureComponent {
         }
       }
 
-      this.setState({ 
+      const newState = { 
         playerTurn: this.state.playerTurn === WHITE ? BLACK : WHITE,
         board: {
           ...this.state.board,
@@ -890,17 +861,33 @@ class Board extends PureComponent {
         castling: current.castling || this.state.castling,
         enPassantPieceCoordinate: current.enPassant ? current.enPassant : '',
         historyMoves: historyMoves.slice(0, historyMovesLength),
-      }, this.updateFEN);
+        playerInCheck: current.inCheck ? null : this.state.playerInCheck 
+      };
+
+      const { FENString } = this.updateFEN(newState);
+      chess.load(FENString);
+
+      this.setState(newState, this.updateFEN);
     }
   }
 
-  updateFEN = () => {
-    const { historyMoves, halfMoveClock } = this.getHistoryMoves(this.state.halfMoveClock);
+  updateFEN = (_state = null) => {
+    const state = _state || this.state;
 
-    const enPassantAttackCoordinate = this.state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(this.state.enPassantPieceCoordinate, this.state.board) : '-';
-    const { FENString, fullMoveCount } = boardToFEN(this.state.board, this.state.playerTurn, this.state.castling, enPassantAttackCoordinate, historyMoves, halfMoveClock, this.state.fullMoveCount);
+    const { historyMoves, halfMoveClock } = this.getHistoryMoves(state.halfMoveClock);
+
+    const enPassantAttackCoordinate = state.enPassantPieceCoordinate ? getEnpassantAttackCoordinate(state.enPassantPieceCoordinate, state.board) : '-';
+    const { FENString, fullMoveCount } = boardToFEN(state.board, state.playerTurn, state.castling, enPassantAttackCoordinate, historyMoves, halfMoveClock, state.fullMoveCount);
 
     this.historyMoves = historyMoves;
+
+    if(_state) {
+      return {
+        FENString: FENString,
+        halfMoveClock: halfMoveClock,
+        fullMoveCount: fullMoveCount
+      }
+    }
 
     this.setState({
       FENString: FENString,
@@ -982,6 +969,11 @@ class Board extends PureComponent {
         }
       }
 
+      // In Check
+      if(current.inCheck) {
+        move = move + '+';
+      }
+
       if(isFullMove) {
         historyMoves.push([ move ]);
       } else {
@@ -1012,6 +1004,16 @@ class Board extends PureComponent {
 
     const boardDetails = FENToBoard(value);
 
+    chess.load(value);
+
+    if(chess.in_check()) {
+      boardDetails.playerInCheck = chess.turn();
+    }
+
+    if(chess.game_over()) {
+      boardDetails.checkMate = chess.turn();
+    }
+
     this.setState({
       ...this.state,
       ...boardDetails,
@@ -1035,6 +1037,22 @@ class Board extends PureComponent {
       },
       promotionCoordinate: ''
     }, this.updateFEN);
+  }
+
+  renderCheckMate = () => {
+    const checkMate = this.state.checkMate;
+
+    if(checkMate) {
+      const player = this.state.checkMate === WHITE ? 'Black': 'White';
+  
+      return (
+        <div className="check-mate small">
+          { player } Player Win!
+        </div>
+      );
+    }
+
+    return null;
   }
 
   renderPawnPromotionModal = (coordinate) => {
@@ -1158,7 +1176,7 @@ class Board extends PureComponent {
             </div>
 
             <div className="container">
-
+              { this.renderCheckMate() }
               { this.renderPawnPromotionModal(promotionCoordinate) }
 
               <div className={`board ${this.state.theme}`}>
@@ -1169,7 +1187,7 @@ class Board extends PureComponent {
                   const rowPosition = index;
 
                   return (
-                    <div className={`board-row ${promotionCoordinate ? 'opacity' : ''}`} key={rowId}>
+                    <div className={`board-row ${promotionCoordinate || this.state.checkMate ? 'opacity' : ''}`} key={rowId}>
                       {cellPositions.map((cellPosition, inx) => {
                         const cellId = `cell-${cellPosition}`;
                         const cellColor = (rowPosition + inx + pieceColorValue) % 2 === 1 ? 'black' : 'white';
@@ -1179,8 +1197,9 @@ class Board extends PureComponent {
 
                         const isChessPiece = board[cellCooridinate] ? true : false;
                         const isPlayerChessPiece = this.isPlayerChessPiece(chessPiece);
-                        const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? cellCooridinate === enPassantAttackCoordinate || this.isOpponentChessPiece(chessPiece) : this.isOpponentChessPiece(chessPiece);
                         const isActive = this.state.selectedCoordinate === cellCooridinate;
+                        const selectedChessPiece = board[this.state.selectedCoordinate] || '';
+                        const isOpponentChessPiece = this.state.enPassantPieceCoordinate ? ((cellCooridinate === enPassantAttackCoordinate && selectedChessPiece.endsWith('p')) || this.isOpponentChessPiece(chessPiece)) : this.isOpponentChessPiece(chessPiece);
                         const isPossibleMove = selectedPieceNextMoves.includes(cellCooridinate);
                         const isClickable = isPlayerChessPiece || isPossibleMove;
 
