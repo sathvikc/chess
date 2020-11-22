@@ -738,6 +738,8 @@ class Board extends PureComponent {
             }
           }
         }
+
+        const isPawnPromotion = isPawn && this.checkPawnPromotion(selectedPieceInfo, cellCooridinate) ? cellCooridinate : '';
         
         // Move history
         const move = {
@@ -748,14 +750,13 @@ class Board extends PureComponent {
             castling: this.state.castling,
             castlingPerformed: castlingPerformed,
             inCheck: false,
+            promotionCoordinate: isPawnPromotion || ''
           },
           previous: {
             piece: prevSelectedCell,
             coordinate: prevSelectedCoordinate,
           }
         };
-
-        const isPawnPromotion = isPawn && this.checkPawnPromotion(selectedPieceInfo, cellCooridinate) ? cellCooridinate : '';
 
         const newState = {
           ...this.state,
@@ -782,7 +783,7 @@ class Board extends PureComponent {
           newState.playerInCheck = null;
         }
 
-        if(v === null || chess.game_over()) {
+        if((v === null && chess.in_check()) || chess.game_over()) {
           newState.checkMate = chess.turn();
         }
 
@@ -861,11 +862,18 @@ class Board extends PureComponent {
         castling: current.castling || this.state.castling,
         enPassantPieceCoordinate: current.enPassant ? current.enPassant : '',
         historyMoves: historyMoves.slice(0, historyMovesLength),
-        playerInCheck: current.inCheck ? null : this.state.playerInCheck 
+        playerInCheck: current.inCheck ? null : this.state.playerInCheck,
+        promotionCoordinate: current.promotionCoordinate ? '' : current.promotionCoordinate,
       };
 
       const { FENString } = this.updateFEN(newState);
       chess.load(FENString);
+
+      if(chess.in_check()) {
+        newState.playerInCheck = chess.turn();
+      } else {
+        newState.playerInCheck = null;
+      }
 
       this.setState(newState, this.updateFEN);
     }
