@@ -263,6 +263,7 @@ class Board extends PureComponent {
           }
         }
 
+        // Pawn Promotion
         const isPawnPromotion = isPawn && this.checkPawnPromotion(selectedPieceInfo, cellCooridinate) ? cellCooridinate : '';
         
         // Move history
@@ -300,6 +301,7 @@ class Board extends PureComponent {
 
         const v = chess.move({ from: move.previous.coordinate, to: move.current.coordinate });
 
+        // Check
         if(chess.in_check()) {
           newState.playerInCheck = chess.turn();
           move.current.inCheck = true;
@@ -307,6 +309,7 @@ class Board extends PureComponent {
           newState.playerInCheck = null;
         }
 
+        // Game over
         if((v === null && chess.in_check()) || chess.game_over()) {
           newState.checkMate = chess.turn();
         }
