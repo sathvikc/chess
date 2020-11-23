@@ -321,27 +321,27 @@ function getKingMoves(piece, board, castlingString) {
 function getMovesBySelectedPiece(piece, board, options) {
   if(!piece) return [];
 
-  if(piece['rank'] === 'p') {
+  if(piece['rank'] === 'p') { // pawn
     return getPawnMoves(piece, board, options.enPassantPieceCoordinate);
   }
 
-  if(piece['rank'] === 'r') {
+  if(piece['rank'] === 'r') { // rook
     return getRookMoves(piece, board);
   }
 
-  if(piece['rank'] === 'n') {
+  if(piece['rank'] === 'n') { // knight
     return getKnightMoves(piece, board);
   }
 
-  if(piece['rank'] === 'b') {
+  if(piece['rank'] === 'b') { // bishop
     return getBishopMoves(piece, board);
   }
 
-  if(piece['rank'] === 'q') {
+  if(piece['rank'] === 'q') { // queen
     return getQueenMoves(piece, board);
   }
 
-  if(piece['rank'] === 'k') {
+  if(piece['rank'] === 'k') { // king
     return getKingMoves(piece, board, options.castling);
   }
 
